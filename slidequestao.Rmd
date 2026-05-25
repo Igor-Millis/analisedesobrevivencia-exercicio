@@ -1,0 +1,172 @@
+---
+title: "Análise de Sobrevivência"
+output: pdf
+date: "2026-05-25"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+## Questão 4 - Capítulo 
+A tabela 4.12 mostra os tempos de sobrevida, em meses, de pacientes com a mesma doença os quais foram submetidos aos tratamentos A ou B. O símbolo + indica censura.
+
+Considerando a covariável $X = tratamento$, em que $X=0$ se tratamento A e $X=1$ se tratamento B.
+
+| Tratamento - Tempo de Sobrevida em Meses |
+|---------------------------------------------------------------|
+| A  1  2  2  2  2+  6  8  8  9  9+  13  13+  16  17  22+  25+  29  34  36  43+  45+ |
+| B  1  2  5  7  7+  11+  12  19  22  30  35+  39  42  46  55             |
+
+## Questão
+
+a) Ajuste os modelos de regressão exponencial, de Weibull e log-normal e selecione o mais adequado aos dados.
+b) Com base no modelo selecionado em (a), utilize o teste da razão de verossimilhanças para testar se os tratamentos A e B diferem.
+c) Para o modelo selecionado, apresente a análise gráfica dos resíduos e a(s) curva(s) de sobrevivência estimada(s).
+d) Com base no modelo selecionado, estime e interprete a sobrevivência em t = 40 meses
+
+## Inserindo os Dados no R
+a) Ajuste os modelos de regressão exponencial, de Weibull e log-normal e selecione o mais adequado aos dados.
+
+```{r, echo = TRUE, warning=FALSE}
+library(survival)
+library(flexsurv)
+# Tratamento A
+tempo_A <- c(1,2,2,2,2,6,8,8,9,9,13,13,16,17,22,25,29,34,36,43,45)
+status_A <- c(1,1,1,1,0,1,1,1,1,0,1,0,1,1,0,0,1,1,1,0,0) # 1 = falha
+trat_A <- rep(0,length(tempo_A))
+
+# Tratamento B
+tempo_B <- c(1,2,5,7,7,11,12,19,22,30,35,39,42,46,55)
+status_B <- c(1,1,1,1,0,0,1,1,1,1,0,1,1,1,1)
+trat_B <- rep(1,length(tempo_B))
+```
+
+
+## Junção dos Dados
+
+```{r, echo = TRUE, warning=FALSE}
+tempo <- c(tempo_A, tempo_B)
+status <- c(status_A, status_B)
+trat <- c(trat_A, trat_B)
+
+dados <- data.frame(tempo = tempo,status = status,tratamento = trat)
+Surv_obj <- Surv(time = dados$tempo,event = dados$status)
+mod_exp <- survreg(Surv_obj ~ tratamento, data = dados,
+                   dist = "exponential")
+```
+
+## Modelo Exponencial
+
+```{r, echo = TRUE, warning=FALSE}
+summary(mod_exp)
+```
+
+## Modelo Exponencial
+
+```{r, echo = TRUE, warning=FALSE, eval=FALSE}
+summary(mod_exp)
+```
+
+O modelo exponencial AFT ajustado indica que o grupo tratamento apresenta um tempo de sobrevivência estimado aproximadamente 13,5% maior que o grupo controle (TR ≈ 1.14). Entretanto, esse efeito não é estatisticamente significativo (p = 0.75), sugerindo ausência de evidência de diferença entre os grupos.
+
+O intercepto indica um tempo basal de sobrevivência de aproximadamente 24.4 unidades de tempo para o grupo controle. Como esperado para o modelo exponencial no survreg, o parâmetro de escala é fixo em 1, não sendo estimado.
+
+## Modelo Weibull
+```{r, echo = TRUE, warning=FALSE}
+summary(mod_weib <- survreg(Surv_obj ~ tratamento,data = dados,
+  dist = "weibull"))
+```
+
+## Modelo Weibull
+```{r, echo = TRUE, warning=FALSE, eval=FALSE}
+summary(mod_weib <- survreg(Surv_obj ~ tratamento,data = dados,
+  dist = "weibull"))
+```
+
+O modelo Weibull AFT ajustado indica que o grupo tratamento apresenta um tempo de sobrevivência estimado aproximadamente 14% maior que o grupo controle (TR ≈ 1.14). Entretanto, esse efeito não é estatisticamente significativo (p = 0.73), não havendo evidência de diferença entre os grupos. O intercepto indica um tempo basal de sobrevivência de aproximadamente 24.4 unidades de tempo para o grupo controle.
+
+O parâmetro de escala estimado (σ ≈ 0.97) não difere significativamente de 1 (p = 0.85), sugerindo que a forma da distribuição Weibull é adequada sem necessidade de ajustes adicionais.
+
+## Modelo Log-normal
+```{r, echo = TRUE, warning=FALSE}
+mod_lognormal <- survreg(Surv_obj ~ tratamento, data = dados,
+                         dist = "lognormal")
+summary(mod_lognormal)
+```
+
+## Modelo Log-normal
+```{r, echo = TRUE, warning=FALSE, eval=FALSE}
+mod_lognormal <- survreg(Surv_obj ~ tratamento, data = dados,
+                         dist = "lognormal")
+summary(mod_lognormal)
+```
+
+O modelo lognormal AFT indica que o grupo tratamento apresenta um tempo de sobrevivência estimado aproximadamente 21% maior que o grupo controle (TR ≈ 1.21). No entanto, esse efeito não é estatisticamente significativo (p = 0.69), não havendo evidência de diferença entre os grupos. O intercepto indica um tempo central de sobrevivência de aproximadamente 14.5 unidades de tempo para o grupo controle.
+
+O parâmetro de escala (σ ≈ 1.34) é estatisticamente significativo (p = 0.037), indicando elevada variabilidade nos log-tempos de sobrevivência, o que sugere uma distribuição mais dispersa dos tempos de vida.
+
+## Critérios de Avaliação e Comparação do Modelo
+```{r, echo = TRUE, warning=FALSE}
+AIC(mod_exp, mod_weib, mod_lognormal)
+BIC(mod_exp, mod_weib, mod_lognormal)
+```
+
+## Teste de Verossimilhança
+
+O melhor modelo ajustado, levando em conta BIC e AIC, não apresenta melhora significativa em relação ao modelo sem covariáveis, conforme o teste de razão de verossimilhança (p = 0.75).
+
+## KM vs Modelo Exponencial
+
+```{r, echo = FALSE, warning=FALSE}
+km <- survfit(Surv_obj ~ tratamento, data = dados)
+
+plot(km,
+     col = c(1,2),
+     lty = 1,
+     xlab = "Tempo",
+     ylab = "S(t)",
+     main = "Exponencial: KM vs Modelo")
+
+legend("topright",
+       legend = c("Tratamento A","Tratamento B"),
+       col = c(1,2),
+       lty = 1)
+```
+
+## Análise Gráfica dos Resíduos
+
+```{r, echo = FALSE, warning=FALSE}
+fit_exp <- flexsurvreg(Surv_obj ~ tratamento,
+                       data = dados,
+                       dist = "exp")
+
+S_hat <- summary(fit_exp, newdata = dados, type = "survival")[[1]]$est
+
+cs_exp <- -log(S_hat)
+
+n <- length(cs_exp)
+cs_sorted <- sort(cs_exp)
+
+plot(cs_sorted,
+     -log(1 - (1:n)/n),
+     xlab = "Resíduos de Cox-Snell",
+     ylab = "Exp(1) teórico",
+     main = "Diagnóstico - Exponencial")
+
+abline(0, 1, col = "red", lwd = 2)
+```
+
+## Estimando t = 40 meses
+
+Para estimar a probabilidade do indivíduo sobreviver além de 40 meses, temos: 
+
+$log(T) = \beta_0 + \beta_1*tratamento$, com intercepto $= 3.196$ e tratamento $= 0.127$
+
+Convertendo para escala de sobrevivência
+
+$S(t) = exp(-\frac{t}{\mu})$ onde $\mu = exp(\eta)$
+
+No grupo controle (tratamento $= 0$), a média da sobrevivência é $\eta_0=3.196$ e $\mu_0= exp^{3.196} = 24.4$. Então
+
+$S_0(40) = exp(-\frac{40}{24.4}) = exp(-1.639) = 0.194 = 19.4\%$ 
